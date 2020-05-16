@@ -1,0 +1,24 @@
+// proto provides the service and messages definitions
+syntax = "proto3";
+
+package proto;
+
+// service definition
+service GrpcMicroservice {
+	// service methods
+	rpc Method (Request) returns (Reply) {}
+	rpc NoRequestMethod (Empty) returns (Reply) {}
+}
+
+// common practice to represent empty messages
+message Empty {}
+
+// message structure used for requests to SayHello method
+message Request {
+	string name = 1;
+}
+
+// message structure used for the SayHello method response
+message Reply {
+	string message = 1;
+}	
