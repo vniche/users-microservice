@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -9,12 +10,11 @@ import (
 
 	"github.com/99designs/gqlgen/handler"
 	"github.com/vniche/users-microservice/datastore"
+	"github.com/vniche/users-microservice/entities"
 	"github.com/vniche/users-microservice/graphql"
 	pb "github.com/vniche/users-microservice/protocol"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 )
 
 // server is used to implement proto.GrpcMicroservice
@@ -22,12 +22,35 @@ type server struct {
 	pb.UnimplementedUsersServer
 }
 
-func (s *server) SignUp(ctx context.Context, req *pb.User) (*pb.Created, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SignUp not implemented")
+func (s *server) SignUp(ctx context.Context, req *pb.NewUser) (*pb.Created, error) {
+	uid, err := entities.SignUp(&entities.User{
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Unable to sign up user %s: %s", req.FirstName, err.Error())
+	}
+
+	return &pb.Created{Uid: uid}, nil
 }
 
 func (s *server) List(ctx context.Context, req *pb.Empty) (*pb.UserList, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+	users, err := entities.List()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to list users: %s", err.Error())
+	}
+
+	parsed := make([]*pb.User, len(users))
+	for index, user := range users {
+		parsed[index] = &pb.User{
+			Uid:       user.UID,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			CreatedAt: user.CreatedAt.String(),
+		}
+	}
+
+	return &pb.UserList{Users: parsed}, nil
 }
 
 func main() {
