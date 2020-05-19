@@ -78,6 +78,7 @@ func serve(ctx context.Context) (err error) {
 
 	go func() {
 		// starts gRPC server with the TCP listener
+		log.Printf("gRPC is available at tcp://localhost%s", grpcPort)
 		if err := grpcServer.Serve(listen); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
@@ -102,9 +103,9 @@ func serve(ctx context.Context) (err error) {
 
 	go func() {
 		// starts graphql http server with the TCP listener
-		log.Printf("connect to http://localhost:%s/graphql/playground for GraphQL playground", graphqlPort)
+		log.Printf("GraphQL Playground is available at http://localhost%s/graphql/playground", graphqlPort)
 		if err = graphqlServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen:%+s\n", err)
+			log.Fatalf("listen: %+v\n", err)
 		}
 	}()
 
@@ -119,7 +120,7 @@ func serve(ctx context.Context) (err error) {
 		cancel()
 	}()
 
-	grpcServer.Stop()
+	grpcServer.GracefulStop()
 
 	if err = graphqlServer.Shutdown(ctxShutDown); err != nil {
 		log.Fatalf("unable to shutdown graphql server:%+s\n", err)
@@ -147,6 +148,6 @@ func main() {
 	}()
 
 	if err := serve(ctx); err != nil {
-		log.Printf("failed to serve:+%v\n", err)
+		log.Printf("failed to serve: %+v\n", err)
 	}
 }
