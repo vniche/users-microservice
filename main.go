@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"time"
 
 	"github.com/99designs/gqlgen/handler"
 	"github.com/vniche/users-microservice/datastore"
@@ -53,12 +55,20 @@ func (s *server) List(ctx context.Context, req *pb.Empty) (*pb.UserList, error) 
 	return &pb.UserList{Users: parsed}, nil
 }
 
-func main() {
+func serve(ctx context.Context) (err error) {
 	// GRPC Server
 	grpcPort := ":5000"
 	if os.Getenv("GRPC_PORT") != "" {
 		grpcPort = os.Getenv("GRPC_PORT")
 	}
+
+	datastore.Start()
+	defer datastore.Client.Close()
+
+	// creates a new gRPC server instance and register microservice to it
+	grpcServer := grpc.NewServer()
+	pb.RegisterUsersServer(grpcServer, &server{})
+	reflection.Register(grpcServer)
 
 	// creates a new TCP listener
 	listen, err := net.Listen("tcp", grpcPort)
@@ -66,30 +76,77 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	datastore.Start()
-	defer datastore.Client.Close()
-
-	// creates a new gRPC server instance and register microservice to it
-	srv := grpc.NewServer()
-	pb.RegisterUsersServer(srv, &server{})
-	reflection.Register(srv)
+	go func() {
+		// starts gRPC server with the TCP listener
+		if err := grpcServer.Serve(listen); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
 
 	// GraphQL Server
-	graphqlPort := "3000"
+	graphqlPort := ":3000"
 	if os.Getenv("GRAPHQL_PORT") != "" {
 		graphqlPort = os.Getenv("GRAPHQL_PORT")
 	}
 
-	http.Handle("/graphql/playground", handler.Playground("GraphQL playground", "/query"))
-	http.Handle("/query", handler.GraphQL(graphql.NewExecutableSchema(
+	mux := http.NewServeMux()
+	mux.Handle("/graphql/playground", handler.Playground("GraphQL playground", "/query"))
+	mux.Handle("/query", handler.GraphQL(graphql.NewExecutableSchema(
 		graphql.Config{Resolvers: &graphql.Resolver{}}),
 	))
 
-	log.Printf("connect to http://localhost:%s/graphql/playground for GraphQL playground", graphqlPort)
-	log.Fatal(http.ListenAndServe(":"+graphqlPort, nil))
+	graphqlServer := &http.Server{
+		Addr:    graphqlPort,
+		Handler: mux,
+	}
 
-	// starts gRPC server with the TCP listener
-	if err := srv.Serve(listen); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	go func() {
+		// starts graphql http server with the TCP listener
+		log.Printf("connect to http://localhost:%s/graphql/playground for GraphQL playground", graphqlPort)
+		if err = graphqlServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen:%+s\n", err)
+		}
+	}()
+
+	log.Printf("server started")
+
+	<-ctx.Done()
+
+	log.Printf("server stopped")
+
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		cancel()
+	}()
+
+	grpcServer.Stop()
+
+	if err = graphqlServer.Shutdown(ctxShutDown); err != nil {
+		log.Fatalf("unable to shutdown graphql server:%+s\n", err)
+	}
+
+	log.Printf("server exited properly")
+
+	if err == http.ErrServerClosed {
+		err = nil
+	}
+
+	return
+}
+
+func main() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		oscall := <-c
+		log.Printf("system call:%+v", oscall)
+		cancel()
+	}()
+
+	if err := serve(ctx); err != nil {
+		log.Printf("failed to serve:+%v\n", err)
 	}
 }
