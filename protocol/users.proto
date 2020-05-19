@@ -18,9 +18,10 @@ message NewUser {
 }
 
 message User {
-	string first_name = 1;
-	string last_name = 2;
-	string created_at = 3;
+	string uid = 1;
+	string first_name = 2;
+	string last_name = 3;
+	string created_at = 4;
 }
 
 message Created {
