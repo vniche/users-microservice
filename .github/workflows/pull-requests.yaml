@@ -41,7 +41,4 @@ jobs:
           done
 
       - name: run tests
-        run: go test -v -covermod=count ./...
-
-      - name: build binary
-        run: go build -v .
+        run: go test -covermod=count -v ./...
