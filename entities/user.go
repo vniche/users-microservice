@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mosuka/cete/protobuf"
+	"github.com/vniche/cete/protobuf"
 	"github.com/vniche/users-microservice/datastore"
 	"google.golang.org/grpc"
 )

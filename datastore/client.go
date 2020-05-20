@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	ceteProto "github.com/mosuka/cete/protobuf"
+	ceteProto "github.com/vniche/cete/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
