@@ -1,0 +1,53 @@
+on:
+  pull_request:
+    branches:
+      - development
+      - master
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    container: golang:1.14-alpine
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: cache go modules
+        uses: actions/cache@v1
+        with:
+          path: /go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - name: fetch dependencies if not present
+        run: |
+          if [ ! -d "/go/pkg/mod" ]; then
+            go mod tidy
+          fi
+
+      - name: start cete node
+        run: |
+          docker run -d --rm --name cete-node1 \
+          -p 7000:7000 \
+          -p 8000:8000 \ 
+          -p 9000:9000 \
+          vniche/cete:latest cete start \
+            --id=node1 \
+            --raft-address=:7000 \
+            --grpc-address=:9000 \
+            --http-address=:8000 \
+            --data-directory=/tmp/cete/node1
+
+      - name: wait for cete to startup
+        run: |
+          while ! timeout 3 nc -zv 127.0.0.1 26379 || ! timeout 3 nc -zv 127.0.0.1 6379
+          do
+            sleep 3
+          done
+
+      - name: run tests
+        run: go test -v -covermod=count ./...
+
+      - name: build binary
+        run: go build -v .

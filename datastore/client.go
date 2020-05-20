@@ -42,6 +42,6 @@ func (client *DataStoreClient) Node() (*ceteProto.NodeResponse, error) {
 	return client.KVSClient.Node(context.Background(), &emptypb.Empty{}, grpc.EmptyCallOption{})
 }
 
-func (client *DataStoreClient) Close() error {
-	return client.Conn.Close()
+func Close() error {
+	return Client.Conn.Close()
 }
