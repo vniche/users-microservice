@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	ceteProto "github.com/mosuka/cete/protobuf"
+	ceteProto "github.com/vniche/cete/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -42,6 +42,6 @@ func (client *DataStoreClient) Node() (*ceteProto.NodeResponse, error) {
 	return client.KVSClient.Node(context.Background(), &emptypb.Empty{}, grpc.EmptyCallOption{})
 }
 
-func (client *DataStoreClient) Close() error {
-	return client.Conn.Close()
+func Close() error {
+	return Client.Conn.Close()
 }

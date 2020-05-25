@@ -1,0 +1,129 @@
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: install go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.x
+
+      - name: install golangci-lint
+        run: |
+          go get github.com/golangci/golangci-lint/cmd/golangci-lint
+
+      - name: run linters
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin   
+          golangci-lint run
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: install go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.x
+
+      - name: cache go modules
+        uses: actions/cache@v1
+        with:
+          path: /go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - name: fetch dependencies if not present
+        run: |
+          if [ ! -d "/go/pkg/mod" ]; then
+            go mod tidy
+          fi
+
+      - name: start cete node
+        run: bash start-db.sh
+
+      - name: wait for cete to startup
+        run: |
+          while ! timeout 3 nc -zv 127.0.0.1 9000
+          do
+            sleep 3
+          done
+
+      - name: run tests
+        run: go test -covermode=count -v ./...
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: install go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.x
+
+      - name: Cache go modules
+        uses: actions/cache@v1
+        with:
+          path: /go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - name: Fetch dependencies if not present
+        run: |
+          if [ ! -d "/go/pkg/mod" ]; then
+            go mod tidy
+          fi
+
+      - name: Builds distribution binary
+        run: go build -o app .
+
+      - name: Compress build binary
+        run: tar -czvf build.tar.gz app
+
+      - name: Upload distribution package
+        uses: actions/upload-artifact@v1
+        with:
+          name: distribution
+          path: build.tar.gz
+
+  docker-build-n-push:
+    name: docker build 'n push
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Downloads pre-built distribution folder
+        uses: actions/download-artifact@v1
+        with:
+          name: distribution
+
+      - name: Uncompress distribution folder
+        run: |
+          tar -xzvf distribution/build.tar.gz
+          rm -rf distribution/
+
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag $OWNER/$REPO:${{ github.sha }}
+
+      - name: Log into registry
+        run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u ${{ secrets.DOCKER_LOGIN }} --password-stdin
+
+      - name: Push image
+        run: |
+          # pushes unique commit sha based tag
+          docker push $OWNER/$REPO:${{ github.sha }}

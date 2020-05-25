@@ -1,0 +1,63 @@
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: install go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.x
+
+      - name: install golangci-lint
+        run: |
+          go get github.com/golangci/golangci-lint/cmd/golangci-lint
+
+      - name: run linters
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin   
+          golangci-lint run
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: install go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14.x
+
+      - name: cache go modules
+        uses: actions/cache@v1
+        with:
+          path: /go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - name: fetch dependencies if not present
+        run: |
+          if [ ! -d "/go/pkg/mod" ]; then
+            go mod tidy
+          fi
+
+      - name: start cete node
+        run: bash start-db.sh
+
+      - name: wait for cete to startup
+        run: |
+          while ! timeout 3 nc -zv 127.0.0.1 9000
+          do
+            sleep 3
+          done
+
+      - name: run tests
+        run: go test -covermode=count -v ./...

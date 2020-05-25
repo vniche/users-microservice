@@ -1,0 +1,4 @@
+exclude_patterns:
+  - "graphql/generate.go"
+  - "graphql/models_gen.go"
+  - "protocol/users.pb.go"
