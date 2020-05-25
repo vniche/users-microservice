@@ -90,8 +90,14 @@ jobs:
             go mod tidy
           fi
 
-      - name: Builds distribution binary
-        run: go build -o app .
+      - name: install gox
+        run: |
+          go get github.com/mitchellh/gox
+
+      - name: build binary
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin   
+          gox -osarch="linux/amd64"
 
       - name: Compress build binary
         run: tar -czvf build.tar.gz app
