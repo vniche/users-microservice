@@ -97,7 +97,7 @@ jobs:
       - name: build binary
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin   
-          gox -osarch="linux/amd64"
+          gox -osarch="linux/amd64" -output="app"
 
       - name: Compress build binary
         run: tar -czvf build.tar.gz app
