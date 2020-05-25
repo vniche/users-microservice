@@ -121,7 +121,7 @@ jobs:
           rm -rf distribution/
 
       - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag $OWNER/$REPO:${{ github.sha }}
+        run: docker build . --file Dockerfile --tag $(dirname $GITHUB_REPOSITORY)/$(basename $GITHUB_REPOSITORY):${{ github.sha }}
 
       - name: Log into registry
         run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u ${{ secrets.DOCKER_LOGIN }} --password-stdin
@@ -129,4 +129,4 @@ jobs:
       - name: Push image
         run: |
           # pushes unique commit sha based tag
-          docker push $OWNER/$REPO:${{ github.sha }}
+          docker push $(dirname $GITHUB_REPOSITORY)/$(basename $GITHUB_REPOSITORY):${{ github.sha }}
